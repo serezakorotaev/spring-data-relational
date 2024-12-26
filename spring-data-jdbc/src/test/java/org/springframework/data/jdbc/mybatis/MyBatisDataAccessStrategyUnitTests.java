@@ -15,14 +15,9 @@
  */
 package org.springframework.data.jdbc.mybatis;
 
-import static java.util.Arrays.*;
-import static java.util.Collections.*;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-import static org.springframework.data.relational.core.sql.SqlIdentifier.*;
-
+import org.apache.ibatis.cursor.Cursor;
 import org.apache.ibatis.session.SqlSession;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -36,6 +31,17 @@ import org.springframework.data.relational.core.conversion.IdValueSource;
 import org.springframework.data.relational.core.mapping.RelationalMappingContext;
 import org.springframework.data.relational.core.mapping.RelationalPersistentProperty;
 
+import java.util.Iterator;
+import java.util.List;
+import java.util.stream.Stream;
+
+import static java.util.Arrays.*;
+import static java.util.Collections.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.data.relational.core.sql.SqlIdentifier.*;
+
 /**
  * Unit tests for the {@link MyBatisDataAccessStrategy}, mainly ensuring that the correct statements get's looked up.
  *
@@ -43,6 +49,7 @@ import org.springframework.data.relational.core.mapping.RelationalPersistentProp
  * @author Mark Paluch
  * @author Tyler Van Gorder
  * @author Chirag Tailor
+ * @author Sergey Korotaev
  */
 public class MyBatisDataAccessStrategyUnitTests {
 
@@ -241,12 +248,69 @@ public class MyBatisDataAccessStrategyUnitTests {
 				);
 	}
 
+	@Test
+	public void findAllStreamable() {
+
+		String value = "some answer";
+
+		Cursor<String> cursor = getCursor(value);
+
+		when(session.selectCursor(anyString(), any())).then(answer -> cursor);
+
+		Stream<String> streamable = accessStrategy.findAllStreamable(String.class);
+
+		verify(session).selectCursor(eq("java.lang.StringMapper.findAllStreamable"), captor.capture());
+
+		assertThat(streamable).isNotNull().containsExactly(value);
+
+		assertThat(captor.getValue()) //
+				.isNotNull() //
+				.extracting( //
+						MyBatisContext::getInstance, //
+						MyBatisContext::getId, //
+						MyBatisContext::getDomainType, //
+						c -> c.get("key") //
+				).containsExactly( //
+						null, //
+						null, //
+						String.class, //
+						null //
+				);
+	}
+
 	@Test // DATAJDBC-123
 	public void findAllById() {
 
 		accessStrategy.findAllById(asList("id1", "id2"), String.class);
 
 		verify(session).selectList(eq("java.lang.StringMapper.findAllById"), captor.capture());
+
+		assertThat(captor.getValue()) //
+				.isNotNull() //
+				.extracting( //
+						MyBatisContext::getInstance, //
+						MyBatisContext::getId, //
+						MyBatisContext::getDomainType, //
+						c -> c.get("key") //
+				).containsExactly( //
+						null, //
+						asList("id1", "id2"), //
+						String.class, //
+						null //
+				);
+	}
+
+	@Test
+	public void findAllByIdStreamable() {
+
+		String value = "some answer 2";
+		Cursor<String> cursor = getCursor(value);
+
+		when(session.selectCursor(anyString(), any())).then(answer -> cursor);
+
+		accessStrategy.findAllByIdStreamable(asList("id1", "id2"), String.class);
+
+		verify(session).selectCursor(eq("java.lang.StringMapper.findAllByIdStreamable"), captor.capture());
 
 		assertThat(captor.getValue()) //
 				.isNotNull() //
@@ -367,6 +431,33 @@ public class MyBatisDataAccessStrategyUnitTests {
 				);
 	}
 
+	@Test
+	public void findAllSortedStreamable() {
+
+		String value = "some answer 3";
+		Cursor<String> cursor = getCursor(value);
+
+		when(session.selectCursor(anyString(), any())).then(answer -> cursor);
+
+		accessStrategy.findAllStreamable(String.class, Sort.by("length"));
+
+		verify(session).selectCursor(eq("java.lang.StringMapper.findAllSortedStreamable"), captor.capture());
+
+		assertThat(captor.getValue()) //
+				.isNotNull() //
+				.extracting( //
+						MyBatisContext::getInstance, //
+						MyBatisContext::getId, //
+						MyBatisContext::getDomainType, //
+						c -> c.get("sort") //
+				).containsExactly( //
+						null, //
+						null, //
+						String.class, //
+						Sort.by("length") //
+				);
+	}
+
 	@Test // DATAJDBC-101
 	public void findAllPaged() {
 
@@ -400,4 +491,34 @@ public class MyBatisDataAccessStrategyUnitTests {
 	}
 
 	private static class ChildTwo {}
+
+	private Cursor<String> getCursor(String value) {
+		return new Cursor<>() {
+			@Override
+			public boolean isOpen() {
+				return false;
+			}
+
+			@Override
+			public boolean isConsumed() {
+				return false;
+			}
+
+			@Override
+			public int getCurrentIndex() {
+				return 0;
+			}
+
+			@Override
+			public void close() {
+
+			}
+
+			@NotNull
+			@Override
+			public Iterator<String> iterator() {
+				return List.of(value).iterator();
+			}
+		};
+	}
 }

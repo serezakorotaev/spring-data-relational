@@ -17,6 +17,7 @@ package org.springframework.data.jdbc.core.convert;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -37,6 +38,7 @@ import org.springframework.util.Assert;
  * @author Myeonghyeon Lee
  * @author Chirag Tailor
  * @author Diego Krupitza
+ * @author Sergey Korotaev
  * @since 1.1
  */
 public class DelegatingDataAccessStrategy implements DataAccessStrategy {
@@ -136,8 +138,18 @@ public class DelegatingDataAccessStrategy implements DataAccessStrategy {
 	}
 
 	@Override
+	public <T> Stream<T> findAllStreamable(Class<T> domainType) {
+		return delegate.findAllStreamable(domainType);
+	}
+
+	@Override
 	public <T> Iterable<T> findAllById(Iterable<?> ids, Class<T> domainType) {
 		return delegate.findAllById(ids, domainType);
+	}
+
+	@Override
+	public <T> Stream<T> findAllByIdStreamable(Iterable<?> ids, Class<T> domainType) {
+		return delegate.findAllByIdStreamable(ids, domainType);
 	}
 
 	@Override
@@ -157,6 +169,11 @@ public class DelegatingDataAccessStrategy implements DataAccessStrategy {
 	}
 
 	@Override
+	public <T> Stream<T> findAllStreamable(Class<T> domainType, Sort sort) {
+		return delegate.findAllStreamable(domainType, sort);
+	}
+
+	@Override
 	public <T> Iterable<T> findAll(Class<T> domainType, Pageable pageable) {
 		return delegate.findAll(domainType, pageable);
 	}
@@ -169,6 +186,11 @@ public class DelegatingDataAccessStrategy implements DataAccessStrategy {
 	@Override
 	public <T> Iterable<T> findAll(Query query, Class<T> domainType) {
 		return delegate.findAll(query, domainType);
+	}
+
+	@Override
+	public <T> Stream<T> findAllStreamable(Query query, Class<T> domainType) {
+		return delegate.findAllStreamable(query, domainType);
 	}
 
 	@Override
